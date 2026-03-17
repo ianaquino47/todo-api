@@ -1,0 +1,22 @@
+service: todo-api
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: eu-west-2
+  httpApi:
+    cors: true
+
+build:
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+
+functions:
+  createTodo:
+    handler: src/handlers/createTodo.handler
+    events:
+      - httpApi:
+          path: /todos
+          method: post

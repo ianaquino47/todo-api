@@ -1,0 +1,16 @@
+{
+  "name": "todo-api",
+  "version": "1.0.0",
+  "description": "Serverless API for TODO app",
+  "scripts": {
+    "deploy": "serverless deploy --aws-profile dev",
+    "remove": "serverless remove --aws-profile dev"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "esbuild": "^0.24.2",
+    "serverless": "^4.0.0",
+    "serverless-esbuild": "^1.54.0",
+    "typescript": "^5.9.3"
+  }
+}
