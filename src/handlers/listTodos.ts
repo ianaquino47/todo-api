@@ -1,5 +1,4 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
-import type { ITodo } from 'src/domain/todo';
 import type { ITodoRepository } from 'src/repositories/todoRepository';
 import { createTodoRepository } from 'src/repositories/todoRepository';
 
@@ -12,34 +11,17 @@ function getRepository(): ITodoRepository {
   return repository;
 }
 
-// Exposed for testing — allows injecting a fake repository
 export function setRepository(repo: ITodoRepository): void {
   repository = repo;
 }
 
 export const handler = async (
-  event: APIGatewayProxyEventV2,
+  _event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyResultV2> => {
-  if (!event.body) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ message: 'Request body is required' }),
-    };
-  }
-
-  const todo: ITodo = JSON.parse(event.body);
-
-  if (!todo.title?.trim()) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ message: 'Title is required' }),
-    };
-  }
-
-  await getRepository().create(todo);
+  const todos = await getRepository().findAll();
 
   return {
-    statusCode: 201,
-    body: JSON.stringify(todo),
+    statusCode: 200,
+    body: JSON.stringify(todos),
   };
 };

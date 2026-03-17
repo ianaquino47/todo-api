@@ -1,5 +1,16 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { handler } from 'src/handlers/createTodo';
+import { handler, setRepository } from 'src/handlers/createTodo';
+import { FakeTodoRepository } from 'src/tests/fakes/fakeTodoRepository';
+
+const fakeRepo = new FakeTodoRepository();
+
+beforeEach(() => {
+  setRepository(fakeRepo);
+});
+
+afterEach(() => {
+  fakeRepo.clear();
+});
 
 function buildEvent(overrides: Partial<APIGatewayProxyEventV2> = {}): APIGatewayProxyEventV2 {
   return {
@@ -42,7 +53,7 @@ function buildTodoBody(overrides: Record<string, unknown> = {}): string {
 }
 
 describe('createTodo handler', () => {
-  it('should return 201 with the todo when given a valid request', async () => {
+  it('should return 201 and persist the todo when given a valid request', async () => {
     const body = buildTodoBody();
     const event = buildEvent({ body });
 
@@ -52,6 +63,10 @@ describe('createTodo handler', () => {
       statusCode: 201,
       body,
     });
+
+    const stored = fakeRepo.getAll();
+    expect(stored).toHaveLength(1);
+    expect(stored[0]!.id).toBe('550e8400-e29b-41d4-a716-446655440000');
   });
 
   it('should return 201 when title has leading/trailing whitespace', async () => {
