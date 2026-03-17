@@ -54,27 +54,7 @@ todo-api/
 | npm                   | 10+      | Bundled with Node.js                        |
 | AWS CLI               | 2.x      | `brew install awscli`                       |
 | Serverless Framework  | 4.x      | Installed as a dev dependency               |
-| AWS SSO access        | —        | Configured profile `dev` (see below)        |
-
-### AWS SSO Setup
-
-The project uses AWS SSO with named profiles. Ensure `~/.aws/config` contains:
-
-```ini
-[profile dev]
-sso_start_url = https://d-9c6776240f.awsapps.com/start
-sso_region = eu-west-2
-sso_account_id = 250158618739
-sso_role_name = AdministratorAccess
-region = eu-west-2
-output = json
-```
-
-Authenticate before deploying:
-
-```bash
-aws sso login --profile dev
-```
+| AWS SSO access        | —        | Configured profile `dev`                    |
 
 ---
 
