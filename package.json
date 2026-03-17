@@ -4,13 +4,17 @@
   "description": "Serverless API for TODO app",
   "scripts": {
     "deploy": "serverless deploy --aws-profile dev",
-    "remove": "serverless remove --aws-profile dev"
+    "remove": "serverless remove --aws-profile dev",
+    "test": "jest"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",
+    "@types/jest": "^30.0.0",
     "esbuild": "^0.24.2",
+    "jest": "^30.3.0",
     "serverless": "^4.0.0",
     "serverless-esbuild": "^1.54.0",
+    "ts-jest": "^29.4.6",
     "typescript": "^5.9.3"
   }
 }
