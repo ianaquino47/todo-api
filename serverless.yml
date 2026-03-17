@@ -6,6 +6,19 @@ provider:
   region: eu-west-2
   httpApi:
     cors: true
+  environment:
+    TODOS_TABLE_NAME: !Ref TodosTable
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:Scan
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: !GetAtt TodosTable.Arn
 
 build:
   esbuild:
@@ -20,3 +33,38 @@ functions:
       - httpApi:
           path: /todos
           method: post
+
+  listTodos:
+    handler: src/handlers/listTodos.handler
+    events:
+      - httpApi:
+          path: /todos
+          method: get
+
+  updateTodo:
+    handler: src/handlers/updateTodo.handler
+    events:
+      - httpApi:
+          path: /todos/{id}
+          method: put
+
+  deleteTodo:
+    handler: src/handlers/deleteTodo.handler
+    events:
+      - httpApi:
+          path: /todos/{id}
+          method: delete
+
+resources:
+  Resources:
+    TodosTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${sls:stage}-todos
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
