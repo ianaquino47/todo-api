@@ -1,6 +1,6 @@
 # todo-api
 
-Serverless REST API for the [todo-app](https://github.com/ianaquino47/todo-app) frontend. Built with the Serverless Framework v4, TypeScript, and AWS Lambda, deployed behind API Gateway HTTP API with DynamoDB for persistence.
+Serverless REST API and MCP server for the [todo-app](https://github.com/ianaquino47/todo-app) frontend. Built with Serverless Framework v4, TypeScript, and AWS Lambda, deployed behind API Gateway HTTP API with DynamoDB for persistence. Includes an MCP server for AI assistant integration.
 
 ---
 
@@ -11,6 +11,7 @@ Serverless REST API for the [todo-app](https://github.com/ianaquino47/todo-app) 
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
 - [API Reference](#api-reference)
+- [MCP Server](#mcp-server)
 - [Testing](#testing)
 - [Deployment](#deployment)
 - [Configuration](#configuration)
@@ -25,9 +26,15 @@ Serverless REST API for the [todo-app](https://github.com/ianaquino47/todo-app) 
 │  todo-app   │ ────────────────► │  API Gateway v2  │ ─────────────► │   Lambda       │ ────────────────► │  DynamoDB    │
 │  (Vue 3)    │ ◄──────────────── │  (HTTP API)      │ ◄───────────── │   Handlers     │ ◄──────────────── │  (todos)     │
 └─────────────┘   JSON response   └──────────────────┘    response    └────────────────┘                   └──────────────┘
+
+┌─────────────┐      HTTPS       ┌──────────────────┐                 ┌────────────────┐     read/write    ┌──────────────┐
+│  Claude     │ ────────────────► │  Function URL    │ ──────────────► │   MCP Server   │ ────────────────► │  DynamoDB    │
+│  (MCP)      │ ◄──────────────── │  (bearer auth)   │ ◄────────────── │   (Lambda)     │ ◄──────────────── │  (same table)│
+└─────────────┘   JSON-RPC        └──────────────────┘                 └────────────────┘                   └──────────────┘
 ```
 
 - **API Gateway HTTP API** — lightweight, low-latency gateway with built-in CORS support.
+- **Lambda Function URL** — direct HTTP endpoint for the MCP server with streaming response support.
 - **AWS Lambda** — Node.js 20 runtime, bundled with esbuild for fast cold starts.
 - **DynamoDB** — on-demand (PAY_PER_REQUEST) table for todo persistence, provisioned via CloudFormation.
 
@@ -37,7 +44,7 @@ Serverless REST API for the [todo-app](https://github.com/ianaquino47/todo-app) 
 
 ```
 todo-api/
-├── serverless.yml              # Service definition, IAM, DynamoDB resource
+├── serverless.ts               # Service definition (TypeScript), IAM, DynamoDB resource
 ├── package.json                # Dependencies and scripts
 ├── tsconfig.json               # TypeScript configuration (ES2022, strict)
 ├── jest.config.js              # Jest test configuration
@@ -51,10 +58,20 @@ todo-api/
     │   ├── listTodos.ts        # GET /todos
     │   ├── updateTodo.ts       # PUT /todos/{id}
     │   ├── deleteTodo.ts       # DELETE /todos/{id}
-    │   └── __tests__/          # Handler integration tests (17 tests)
+    │   ├── mcpServer.ts        # MCP server (Function URL)
+    │   └── __tests__/          # Handler integration tests
+    ├── mcp/
+    │   ├── schemas.ts          # Zod input schemas for MCP tools
+    │   ├── toolHandler.ts      # ITodoOperations interface + tool registration
+    │   ├── httpClient.ts       # HTTP-backed operations (local dev)
+    │   ├── dynamoOperations.ts # DynamoDB-backed operations (deployed)
+    │   ├── auth.ts             # SSM token reading + bearer validation
+    │   ├── localServer.ts      # Local stdio MCP server entry point
+    │   └── __tests__/          # MCP tool and auth tests
     └── tests/
         └── fakes/
-            └── fakeTodoRepository.ts   # In-memory fake for testing
+            ├── fakeTodoRepository.ts   # In-memory fake for handler tests
+            └── fakeTodoOperations.ts   # In-memory fake for MCP tool tests
 ```
 
 ---
@@ -183,18 +200,59 @@ curl -X DELETE "$API/todos/test-1"
 
 ---
 
+## MCP Server
+
+The MCP (Model Context Protocol) server exposes the TODO API as tools that AI assistants like Claude can discover and call.
+
+### Tools
+
+| Tool | Input | Description |
+|------|-------|-------------|
+| `list_todos` | — | Retrieves all TODO items with completion status |
+| `add_todo` | `{ title }` | Creates a new TODO item |
+| `update_todo` | `{ id, title }` | Updates a TODO item's title |
+| `complete_todo` | `{ id }` | Marks a TODO item as completed |
+| `delete_todo` | `{ id }` | Permanently removes a TODO item |
+
+### Local Development (stdio)
+
+The local MCP server calls the deployed REST API via HTTP:
+
+```bash
+# Start the local MCP server
+npm run mcp:local
+
+# Or register with Claude Code
+claude mcp add --transport stdio todo-mcp -- npx tsx /path/to/todo-api/src/mcp/localServer.ts
+```
+
+### Deployed (Function URL)
+
+The deployed MCP server talks to DynamoDB directly and is protected by bearer token authentication:
+
+```
+Endpoint: https://3yyi5atgiyudaltz2xndqd3rha0uxdxz.lambda-url.eu-west-2.on.aws/
+Auth:     Bearer token (stored in SSM at /todo-app/mcp-auth-token)
+```
+
+Requests without a valid bearer token receive a `401 Unauthorised` response.
+
+---
+
 ## Testing
 
 ```bash
 npm test
 ```
 
-Runs 17 handler integration tests across 4 test suites using Jest with an in-memory `FakeTodoRepository`:
+Runs 31 tests across 6 test suites using Jest:
 
 - **createTodo** (6 tests) — valid request, whitespace title, missing body, missing/empty/whitespace title
 - **listTodos** (2 tests) — empty list, seeded list
 - **updateTodo** (6 tests) — update title, toggle completed, not found, missing ID/body/fields
 - **deleteTodo** (3 tests) — successful delete, idempotent delete, missing ID
+- **MCP tools** (8 tests) — all 5 tools via in-memory transport, error cases for missing items
+- **Auth** (6 tests) — valid/invalid/missing token, malformed header
 
 ---
 
@@ -210,7 +268,11 @@ npm run deploy
 npx serverless deploy --aws-profile dev
 ```
 
-The deploy output will display the API Gateway endpoint URL. The CloudFormation stack also provisions the DynamoDB table (`todo-api-dev-todos`).
+The deploy output will display:
+- API Gateway endpoint URLs (REST API)
+- Function URL (MCP server)
+
+The CloudFormation stack also provisions the DynamoDB table (`todo-api-dev-todos`).
 
 ### Remove
 
@@ -227,7 +289,7 @@ By default, the service deploys to the `dev` stage. To deploy to a different sta
 npx serverless deploy --stage staging --aws-profile dev
 ```
 
-Each stage gets its own DynamoDB table (`todo-api-{stage}-todos`).
+Each stage gets its own DynamoDB table (`todo-api-{stage}-todos`) and MCP endpoint.
 
 ---
 
@@ -235,7 +297,7 @@ Each stage gets its own DynamoDB table (`todo-api-{stage}-todos`).
 
 ### Serverless
 
-Defined in `serverless.yml`:
+Defined in `serverless.ts`:
 
 | Setting            | Value              | Description                              |
 |--------------------|--------------------|------------------------------------------|
@@ -251,6 +313,15 @@ Defined in `serverless.yml`:
 | Table name        | `todo-api-{stage}-todos` | One table per stage                |
 | Partition key     | `id` (String)      | UUID                                     |
 | Billing mode      | PAY_PER_REQUEST    | On-demand, no capacity planning          |
+
+### MCP Server
+
+| Property          | Value              | Description                              |
+|-------------------|--------------------|------------------------------------------|
+| Timeout           | 30s                | Exceeds slowest DynamoDB call            |
+| Memory            | 512 MB             | Sufficient for MCP SDK overhead          |
+| Invoke mode       | RESPONSE_STREAM    | Supports MCP streaming responses         |
+| Auth token        | SSM SecureString   | `/todo-app/mcp-auth-token`               |
 
 ### TypeScript
 
