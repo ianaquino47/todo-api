@@ -5,7 +5,8 @@
   "scripts": {
     "deploy": "serverless deploy --aws-profile dev",
     "remove": "serverless remove --aws-profile dev",
-    "test": "jest"
+    "test": "jest",
+    "mcp:local": "tsx src/mcp/localServer.ts"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",
