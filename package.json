@@ -9,6 +9,7 @@
     "mcp:local": "tsx src/mcp/localServer.ts"
   },
   "devDependencies": {
+    "@serverless/typescript": "^4.30.0",
     "@types/aws-lambda": "^8.10.145",
     "@types/jest": "^30.0.0",
     "esbuild": "^0.24.2",
@@ -21,6 +22,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1010.0",
+    "@aws-sdk/client-ssm": "^3.1011.0",
     "@aws-sdk/lib-dynamodb": "^3.1010.0",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "zod": "^4.3.6"
